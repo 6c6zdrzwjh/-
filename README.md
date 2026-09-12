@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>密码强度检测器</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e1035 0%, #3c1a6e 100%);
+    color: #e9e2f7;
+    padding: 20px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 480px;
+    background: rgba(52, 30, 92, 0.85);
+    border: 1px solid rgba(167, 139, 250, 0.22);
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+  }
+
+  h1 {
+    font-size: 22px;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #a89bd1;
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  .input-group { position: relative; margin-bottom: 16px; }
+
+  .input-group input {
+    width: 100%;
+    padding: 14px 48px 14px 16px;
+    font-size: 16px;
+    border: 2px solid #46336e;
+    border-radius: 10px;
+    background: #1a0f33;
+    color: #f3eeff;
+    outline: none;
+    transition: border-color 0.25s;
+    letter-spacing: 1px;
+  }
+
+  .input-group input:focus { border-color: #a78bfa; }
+
+  .toggle-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #8070a8;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 6px;
+    transition: color 0.2s;
+  }
+
+  .toggle-btn:hover { color: #e9e2f7; }
+
+  /* 强度条 */
+  .strength-bars {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .bar-segment {
+    height: 8px;
+    flex: 1;
+    border-radius: 4px;
+    background: #3b2b63;
+    transition: background 0.3s;
+  }
+
+  .bar-segment.active.l1 { background: #ef4444; }
+  .bar-segment.active.l2 { background: #f97316; }
+  .bar-segment.active.l3 { background: #eab308; }
+  .bar-segment.active.l4 { background: #84cc16; }
+  .bar-segment.active.l5 { background: #22c55e; }
+
+  .strength-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    margin-bottom: 20px;
+    color: #a89bd1;
+  }
+
+  .strength-label .level {
+    font-weight: 700;
+    transition: color 0.3s;
+  }
+  .level.l1 { color: #ef4444; }
+  .level.l2 { color: #f97316; }
+  .level.l3 { color: #eab308; }
+  .level.l4 { color: #84cc16; }
+  .level.l5 { color: #22c55e; }
+
+  /* 规则清单 */
+  .rules-title {
+    font-size: 13px;
+    color: #8a7ab5;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .rules { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+
+  .rule-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #8070a8;
+    transition: color 0.25s;
+  }
+
+  .rule-item.pass { color: #86efac; }
+
+  .rule-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    background: #3b2b63;
+    flex-shrink: 0;
+    transition: background 0.25s;
+  }
+
+  .rule-item.pass .rule-icon {
+    background: #22c55e;
+    color: #052e16;
+  }
+
+  .rule-item.fail .rule-icon::after { content: "×"; }
+  .rule-item.pass .rule-icon::after { content: "✓"; }
+
+  /* 建议 */
+  .tips-box {
+    background: rgba(167, 139, 250, 0.08);
+    border: 1px solid rgba(167, 139, 250, 0.22);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #ddd0fc;
+    display: none;
+  }
+
+  .tips-box.show { display: block; }
+
+  .tips-box strong { color: #c4b5fd; }
+
+  .score-detail {
+    margin-top: 16px;
+    font-size: 12px;
+    color: #5d5287;
+    text-align: right;
+  }
+
+  /* 破解时间估算 */
+  .crack-time {
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: rgba(167, 139, 250, 0.08);
+    border-radius: 8px;
+    font-size: 13px;
+    color: #a89bd1;
+    display: none;
+  }
+  .crack-time.show { display: block; }
+  .crack-time strong { color: #e9e2f7; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>🔐 密码强度检测器</h1>
+  <p class="subtitle">基于规则引擎实时评估密码安全强度</p>
+
+  <div class="input-group">
+    <input type="password" id="passwordInput" placeholder="请输入要检测的密码..." autocomplete="off">
+    <button class="toggle-btn" id="toggleBtn" title="显示/隐藏密码">👁</button>
+  </div>
+
+  <div class="strength-bars">
+    <div class="bar-segment" data-seg="1"></div>
+    <div class="bar-segment" data-seg="2"></div>
+    <div class="bar-segment" data-seg="3"></div>
+    <div class="bar-segment" data-seg="4"></div>
+    <div class="bar-segment" data-seg="5"></div>
+  </div>
+
+  <div class="strength-label">
+    <span>强度等级：<span class="level" id="levelText">—</span></span>
+    <span id="scoreText">得分：0 / 100</span>
+  </div>
+
+  <div class="rules-title">密码规则检测</div>
+  <div class="rules" id="rulesList">
+    <div class="rule-item" data-rule="length">
+      <span class="rule-icon"></span><span>长度至少 8 位（12 位以上更佳）</span>
+    </div>
+    <div class="rule-item" data-rule="lower">
+      <span class="rule-icon"></span><span>包含小写字母 (a-z)</span>
+    </div>
+    <div class="rule-item" data-rule="upper">
+      <span class="rule-icon"></span><span>包含大写字母 (A-Z)</span>
+    </div>
+    <div class="rule-item" data-rule="digit">
+      <span class="rule-icon"></span><span>包含数字 (0-9)</span>
+    </div>
+    <div class="rule-item" data-rule="special">
+      <span class="rule-icon"></span><span>包含特殊字符 (!@#$%^&* 等)</span>
+    </div>
+    <div class="rule-item" data-rule="noCommon">
+      <span class="rule-icon"></span><span>不是常见弱密码或键盘序列</span>
+    </div>
+    <div class="rule-item" data-rule="noRepeat">
+      <span class="rule-icon"></span><span>无连续重复字符 (如 aaa、111)</span>
+    </div>
+    <div class="rule-item" data-rule="noSeq">
+      <span class="rule-icon"></span><span>无连续序列字符 (如 abc、123、qwe)</span>
+    </div>
+  </div>
+
+  <div class="crack-time" id="crackTime">
+    💻 暴力破解时间估算（假设每秒尝试 <strong>100 亿次</strong>）：<strong id="crackTimeVal">—</strong>
+  </div>
+
+  <div class="tips-box" id="tipsBox">
+    <strong>💡 安全建议：</strong>
+    <ul id="tipsList"></ul>
+  </div>
+
+  <div class="score-detail" id="scoreDetail"></div>
+</div>
+
+<script>
+// ============ 常见弱密码黑名单（示例，可扩展） ============
+const COMMON_PASSWORDS = new Set([
+  "123456", "password", "12345678", "qwerty", "123456789", "12345", "1234",
+  "111111", "1234567", "dragon", "123123", "abc123", "666666", "000000",
+  "qwertyuiop", "123321", "654321", "6789", "123qwe", "a123456", "666888",
+  "112233", "1qaz2wsx", "admin", "password1", "p@ssw0rd", "iloveyou",
+  "sunshine", "princess", "football", "letmein", "welcome", "monkey",
+  "login", "passw0rd", "master", "hello", "freedom", "whatever", "qazwsx"
+]);
+
+// ============ 键盘序列模式 ============
+const KEYBOARD_SEQUENCES = [
+  "qwertyuiop", "asdfghjkl", "zxcvbnm",
+  "1234567890", "0987654321",
+  "abcdefghijklmnopqrstuvwxyz"
+];
+
+// ============ 规则检测函数 ============
+function checkRules(pwd) {
+  const lower = pwd.length > 0 && /[a-z]/.test(pwd);
+  const upper = pwd.length > 0 && /[A-Z]/.test(pwd);
+  const digit = pwd.length > 0 && /[0-9]/.test(pwd);
+  const special = pwd.length > 0 && /[^a-zA-Z0-9]/.test(pwd);
+  const okLength = pwd.length >= 8;
+
+  // 常见密码检测（忽略大小写）
+  const isCommon = COMMON_PASSWORDS.has(pwd.toLowerCase());
+
+  // 连续重复字符（3 个及以上相同）
+  const hasRepeat = /(.)\1{2,}/.test(pwd);
+
+  // 连续序列检测（正序/倒序 3 位及以上，字母或数字或键盘行）
+  const hasSequence = detectSequence(pwd);
+
+  return {
+    length: okLength,
+    lower, upper, digit, special,
+    noCommon: !isCommon && !isCommonSubstring(pwd),
+    noRepeat: !hasRepeat,
+    noSeq: !hasSequence
+  };
+}
+
+function detectSequence(pwd) {
+  if (pwd.length < 3) return false;
+  const p = pwd.toLowerCase();
+  for (let i = 0; i + 3 <= p.length; i++) {
+    const frag = p.slice(i, i + 3);
+    if (isSequentialFrag(frag)) return true;
+  }
+  return false;
+}
+
+function isSequentialFrag(frag) {
+  // 纯字母或纯数字的连续序列
+  const isAlpha = /^[a-z]+$/.test(frag);
+  const isDigit = /^\d+$/.test(frag);
+  if (isAlpha || isDigit) {
+    let asc = true, desc = true;
+    for (let i = 0; i < frag.length - 1; i++) {
+      const diff = frag.charCodeAt(i + 1) - frag.charCodeAt(i);
+      if (diff !== 1) asc = false;
+      if (diff !== -1) desc = false;
+    }
+    if (asc || desc) return true;
+  }
+  // 键盘行序列（如 qwe、asd、zxc）
+  for (const seq of KEYBOARD_SEQUENCES) {
+    if (seq.includes(frag)) return true;
+    const reversed = frag.split("").reverse().join("");
+    if (seq.includes(reversed)) return true;
+  }
+  return false;
+}
+
+function isCommonSubstring(pwd) {
+  const p = pwd.toLowerCase();
+  for (const cp of COMMON_PASSWORDS) {
+    if (cp.length >= 6 && p.includes(cp)) return true;
+  }
+  return false;
+}
+
+// ============ 计算得分 ============
+function calcScore(pwd, rules) {
+  if (!pwd) return 0;
+  let score = 0;
+
+  // 长度得分（0-40）
+  if (pwd.length >= 16) score += 40;
+  else if (pwd.length >= 12) score += 32;
+  else if (pwd.length >= 8) score += 22;
+  else if (pwd.length >= 6) score += 10;
+
+  // 字符种类得分（0-30）
+  const variety = [rules.lower, rules.upper, rules.digit, rules.special]
+    .filter(Boolean).length;
+  score += variety * 7.5;
+
+  // 唯一字符占比（0-15）
+  const uniqueRatio = new Set(pwd).size / pwd.length;
+  score += Math.round(uniqueRatio * 15);
+
+  // 惩罚项
+  if (!rules.noCommon) score = Math.min(score, 10);  // 常见密码直接极弱
+  if (!rules.noRepeat) score -= 15;
+  if (!rules.noSeq) score -= 15;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// ============ 等级映射 ============
+function getLevel(score) {
+  if (score === 0) return { n: 0, text: "—", cls: "" };
+  if (score < 25) return { n: 1, text: "非常弱", cls: "l1" };
+  if (score < 45) return { n: 2, text: "弱", cls: "l2" };
+  if (score < 65) return { n: 3, text: "中等", cls: "l3" };
+  if (score < 85) return { n: 4, text: "强", cls: "l4" };
+  return { n: 5, text: "非常强", cls: "l5" };
+}
+
+// ============ 破解时间估算 ============
+function calcCrackTime(pwd) {
+  if (!pwd) return null;
+  let poolSize = 0;
+  if (/[a-z]/.test(pwd)) poolSize += 26;
+  if (/[A-Z]/.test(pwd)) poolSize += 26;
+  if (/[0-9]/.test(pwd)) poolSize += 10;
+  if (/[^a-zA-Z0-9]/.test(pwd)) poolSize += 33;
+
+  const combinations = Math.pow(Math.max(poolSize, 1), pwd.length);
+  // 假设攻击者平均尝试一半的组合空间，每秒 100 亿次（10^10，现代 GPU 集群量级）
+  const seconds = combinations / 2 / 1e10;
+
+  if (seconds < 1) return "瞬间破解";
+  const units = [
+    [31536000000, "亿年"], [31536000, "年"], [86400, "天"],
+    [3600, "小时"], [60, "分钟"], [1, "秒"]
+  ];
+  for (const [s, name] of units) {
+    if (seconds >= s) {
+      const val = seconds / s;
+      const valStr = val >= 100 ? val.toExponential(2) : val.toFixed(1);
+      return `${valStr} ${name}`;
+    }
+  }
+  return "不到 1 秒";
+}
+
+// ============ 生成建议 ============
+function getTips(pwd, rules, score) {
+  const tips = [];
+  if (pwd.length === 0) return tips;
+  if (!rules.length) tips.push("将密码长度增加到至少 8 位，建议 12 位以上");
+  if (!rules.lower) tips.push("混合使用小写字母");
+  if (!rules.upper) tips.push("加入大写字母");
+  if (!rules.digit) tips.push("加入数字");
+  if (!rules.special) tips.push("加入特殊字符（如 !@#$%^&*）");
+  if (!rules.noCommon) tips.push("避免使用常见密码或包含常见密码（如 123456、password）");
+  if (!rules.noRepeat) tips.push("避免连续重复的字符（如 aaa、111）");
+  if (!rules.noSeq) tips.push("避免字母/数字/键盘连续序列（如 abc、123、qwe）");
+  if (tips.length === 0 && score < 85) {
+    tips.push("进一步增加长度或使用随机生成的密码可以达到更高强度");
+  }
+  if (tips.length === 0) tips.push("非常棒的密码！请妥善保管，不要在多个网站重复使用");
+  return tips;
+}
+
+// ============ UI 渲染 ============
+const input = document.getElementById("passwordInput");
+const levelText = document.getElementById("levelText");
+const scoreText = document.getElementById("scoreText");
+const tipsBox = document.getElementById("tipsBox");
+const tipsList = document.getElementById("tipsList");
+const crackTimeBox = document.getElementById("crackTime");
+const crackTimeVal = document.getElementById("crackTimeVal");
+const scoreDetail = document.getElementById("scoreDetail");
+const segments = document.querySelectorAll(".bar-segment");
+const ruleItems = document.querySelectorAll(".rule-item");
+
+function render() {
+  const pwd = input.value;
+  const rules = checkRules(pwd);
+  const score = calcScore(pwd, rules);
+  const level = getLevel(score);
+
+  // 强度条
+  segments.forEach(seg => {
+    const n = parseInt(seg.dataset.seg);
+    seg.className = "bar-segment" + (n <= level.n ? " active " + level.cls : "");
+  });
+
+  // 等级与得分
+  levelText.textContent = level.text;
+  levelText.className = "level " + level.cls;
+  scoreText.textContent = `得分：${pwd ? score : 0} / 100`;
+
+  // 规则清单
+  ruleItems.forEach(item => {
+    const key = item.dataset.rule;
+    const pass = rules[key];
+    item.className = "rule-item " + (pwd && pass ? "pass" : "fail");
+  });
+
+  // 破解时间
+  if (pwd) {
+    crackTimeBox.classList.add("show");
+    crackTimeVal.textContent = calcCrackTime(pwd);
+  } else {
+    crackTimeBox.classList.remove("show");
+  }
+
+  // 建议
+  const tips = getTips(pwd, rules, score);
+  if (pwd && tips.length) {
+    tipsBox.classList.add("show");
+    tipsList.innerHTML = tips.map(t => `<li>${t}</li>`).join("");
+  } else {
+    tipsBox.classList.remove("show");
+  }
+
+  // 得分明细
+  scoreDetail.textContent = pwd
+    ? `长度 ${pwd.length} 位 · 字符种类 ${[rules.lower, rules.upper, rules.digit, rules.special].filter(Boolean).length}/4 · 唯一字符 ${new Set(pwd).size} 种`
+    : "";
+}
+
+input.addEventListener("input", render);
+
+// 显示/隐藏密码切换
+document.getElementById("toggleBtn").addEventListener("click", () => {
+  const isPwd = input.type === "password";
+  input.type = isPwd ? "text" : "password";
+  document.getElementById("toggleBtn").textContent = isPwd ? "🙈" : "👁";
+});
+
+render();
+</script>
+</body>
+</html>
